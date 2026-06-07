@@ -191,6 +191,8 @@ def process_paper():
     subject = data.get("subject")
     paper_file = data.get("paper_file")
     ms_file = data.get("ms_file")
+    board = data.get("board")
+    level = data.get("level")
     
     if not subject or not paper_file:
         return jsonify({"error": "Subject and paper_file are required"}), 400
@@ -215,7 +217,7 @@ def process_paper():
     
     try:
         # Run local parser to map questions and render pages
-        metadata = map_paper_and_ms(subject, paper_name, paper_path, ms_path, CACHE_DIR)
+        metadata = map_paper_and_ms(subject, paper_name, paper_path, ms_path, CACHE_DIR, board, level)
         return jsonify({"success": True, "metadata": metadata})
     except Exception as e:
         return jsonify({"error": f"Processing failed: {str(e)}"}), 500
@@ -280,6 +282,77 @@ def unprocess_paper():
             return jsonify({"error": f"Failed to delete paper cache: {str(e)}"}), 500
     else:
         return jsonify({"success": True, "message": "Paper is already unmapped"})
+
+@app.route("/api/notes_index", methods=["GET"])
+def get_notes_index_endpoint():
+    subject = request.args.get("subject")
+    board = request.args.get("board")
+    level = request.args.get("level", "a-level")
+    
+    if not subject or not board:
+        return jsonify({"error": "subject and board are required"}), 400
+        
+    from parser import get_or_crawl_notes_index
+    try:
+        notes = get_or_crawl_notes_index(subject, board, level, CACHE_DIR)
+        return jsonify(notes)
+    except Exception as e:
+        return jsonify({"error": f"Failed to retrieve notes index: {str(e)}"}), 500
+
+@app.route("/api/note_content", methods=["GET"])
+def get_note_content():
+    url = request.args.get("url")
+    if not url:
+        return jsonify({"error": "url is required"}), 400
+        
+    if not url.startswith("https://www.savemyexams.com/"):
+        return jsonify({"error": "Invalid URL"}), 400
+        
+    import hashlib
+    url_hash = hashlib.md5(url.encode('utf-8')).hexdigest()
+    
+    notes_cache_dir = os.path.join(CACHE_DIR, "notes")
+    os.makedirs(notes_cache_dir, exist_ok=True)
+    cache_path = os.path.join(notes_cache_dir, f"{url_hash}.html")
+    
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                return jsonify({"content": f.read()})
+        except Exception:
+            pass
+            
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    
+    try:
+        import urllib.request
+        from bs4 import BeautifulSoup
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req) as response:
+            html = response.read()
+            
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        content_div = soup.find(class_=re.compile(r'revision-note-content'))
+        if not content_div:
+            content_div = soup.find(class_=re.compile(r'pageContent'))
+            
+        if not content_div:
+            return jsonify({"error": "Could not extract note content from page structure."}), 500
+            
+        for tag in content_div.find_all(style=True):
+            del tag['style']
+            
+        clean_html = str(content_div)
+        
+        with open(cache_path, "w", encoding="utf-8") as f:
+            f.write(clean_html)
+            
+        return jsonify({"content": clean_html})
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch note content: {str(e)}"}), 500
 
 @app.route("/api/page/paper/<subject>/<paper_name>/<int:page_num>", methods=["GET"])
 def serve_paper_page(subject, paper_name, page_num):

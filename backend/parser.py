@@ -2,6 +2,8 @@ import os
 import re
 import json
 import fitz  # PyMuPDF
+import urllib.request
+from bs4 import BeautifulSoup
 
 def extract_candidates(page, page_num):
     """
@@ -152,7 +154,7 @@ def generate_page_ranges(question_starts, num_pages, pages_candidates):
             
     return mapping
 
-def map_paper_and_ms(subject, paper_name, paper_path, ms_path, cache_dir):
+def map_paper_and_ms(subject, paper_name, paper_path, ms_path, cache_dir, board=None, level=None):
     """
     Main function to parse both PDFs, find questions, map them, render pages, and save metadata.
     """
@@ -218,10 +220,26 @@ def map_paper_and_ms(subject, paper_name, paper_path, ms_path, cache_dir):
     # Sort them numerically
     sorted_qs = sorted(list(all_qs), key=lambda x: int(x) if x.isdigit() else 999)
     
+    # Get or crawl revision notes index if board & level are provided
+    notes = []
+    if board and level:
+        notes = get_or_crawl_notes_index(subject, board, level, cache_dir)
+    
     for q in sorted_qs:
+        # Extract text for this question to auto-match notes
+        q_text = ""
+        q_pages = paper_ranges.get(q, [])
+        for p in q_pages:
+            if 0 < p <= len(paper_doc):
+                q_text += paper_doc[p-1].get_text()
+                
+        best_note, score = find_best_revision_note_match(q_text, notes)
+        
         questions_map[q] = {
-            "paper_pages": paper_ranges.get(q, []),
-            "ms_pages": ms_ranges.get(q, [])
+            "paper_pages": q_pages,
+            "ms_pages": ms_ranges.get(q, []),
+            "note_title": best_note["title"] if best_note else None,
+            "note_url": best_note["url"] if best_note else None
         }
         
     # Metadata summary
@@ -230,6 +248,8 @@ def map_paper_and_ms(subject, paper_name, paper_path, ms_path, cache_dir):
         "paper_name": paper_name,
         "paper_total_pages": paper_num_pages,
         "ms_total_pages": ms_num_pages,
+        "board": board,
+        "level": level,
         "questions": questions_map
     }
     
@@ -243,6 +263,118 @@ def map_paper_and_ms(subject, paper_name, paper_path, ms_path, cache_dir):
     ms_doc.close()
     
     return metadata
+
+def get_or_crawl_notes_index(subject, board, level, cache_dir):
+    subj_folder = os.path.join(cache_dir, subject)
+    os.makedirs(subj_folder, exist_ok=True)
+    cache_file = os.path.join(subj_folder, f"{board.lower()}_notes_index.json")
+    
+    # Load from cache if exists
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+            
+    # Crawl if not cached
+    notes = crawl_savemyexams_notes_index(subject, board, level)
+    if notes:
+        try:
+            with open(cache_file, "w") as f:
+                json.dump(notes, f, indent=2)
+        except Exception:
+            pass
+    return notes
+
+def crawl_savemyexams_notes_index(subject, board, level):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    subj_slug = subject.lower().replace(" ", "-")
+    board_slug = board.lower().replace(" ", "-")
+    level_slug = level.lower().replace(" ", "-")
+    
+    start_url = f"https://www.savemyexams.com/{level_slug}/{subj_slug}/{board_slug}/"
+    try:
+        req = urllib.request.Request(start_url, headers=headers)
+        with urllib.request.urlopen(req) as response:
+            html = response.read().decode('utf-8')
+    except Exception as e:
+        print(f"Error crawling start page {start_url}: {e}")
+        return []
+        
+    soup = BeautifulSoup(html, 'html.parser')
+    index_links = []
+    seen_indices = set()
+    
+    prefix = f"/{level_slug}/{subj_slug}/{board_slug}/"
+    for a in soup.find_all('a', href=True):
+        href = a['href']
+        if href.startswith(prefix):
+            normalized_href = href.rstrip('/')
+            if normalized_href.endswith('/revision-notes') or '/revision-notes/' in href:
+                m = re.search(r'(.*/revision-notes/)', href)
+                if m:
+                    idx_url = m.group(1)
+                    if idx_url not in seen_indices:
+                        seen_indices.add(idx_url)
+                        index_links.append(idx_url)
+                        
+    all_subtopics = []
+    seen_subtopics = set()
+    
+    for idx_link in index_links:
+        full_idx_url = f"https://www.savemyexams.com{idx_link}"
+        try:
+            req = urllib.request.Request(full_idx_url, headers=headers)
+            with urllib.request.urlopen(req) as response:
+                idx_html = response.read().decode('utf-8')
+        except Exception:
+            continue
+            
+        idx_soup = BeautifulSoup(idx_html, 'html.parser')
+        
+        for a in idx_soup.find_all('a', href=True):
+            href = a['href']
+            if href.startswith(idx_link) and href != idx_link:
+                full_sub_url = f"https://www.savemyexams.com{href}"
+                if full_sub_url not in seen_subtopics:
+                    seen_subtopics.add(full_sub_url)
+                    title = a.get_text().strip()
+                    if title and not title.isdigit():
+                        all_subtopics.append({
+                            "title": title,
+                            "url": full_sub_url
+                        })
+                        
+    return all_subtopics
+
+def find_best_revision_note_match(question_text, subtopics):
+    if not subtopics or not question_text:
+        return None, 0
+        
+    q_words = set(re.findall(r'\b[a-z]{3,}\b', question_text.lower()))
+    best_match = None
+    best_score = 0
+    
+    stop_words = {'and', 'the', 'for', 'with', 'from', 'each', 'than', 'this', 'that', 'these', 'those'}
+    
+    for s in subtopics:
+        t_words = [w for w in re.findall(r'\b[a-z]{3,}\b', s["title"].lower()) if w not in stop_words]
+        if not t_words:
+            continue
+            
+        matches = [w for w in t_words if w in q_words]
+        score = len(matches) / len(t_words)
+        
+        if score > best_score:
+            best_score = score
+            best_match = s
+            
+    if best_score > 0.1:
+        return best_match, best_score
+    return None, 0
 
 if __name__ == "__main__":
     # Test script locally

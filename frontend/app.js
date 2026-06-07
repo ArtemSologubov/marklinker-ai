@@ -14,7 +14,8 @@ let state = {
         paper: 1.0,
         ms: 1.0
     },
-    showMarkScheme: false // default to hidden
+    showMarkScheme: false, // default to hidden
+    showNotes: false // default to hidden
 };
 
 // DOM Elements
@@ -39,6 +40,7 @@ const msMatchSelect = document.getElementById('ms-match-select');
 const startAlignBtn = document.getElementById('start-align-btn');
 const unmapPaperBtn = document.getElementById('unmap-paper-btn');
 const toggleMsBtn = document.getElementById('toggle-ms-btn');
+const toggleNotesBtn = document.getElementById('toggle-notes-btn');
 
 const splitScreen = document.getElementById('split-screen');
 const currentQNum = document.getElementById('current-q-num');
@@ -156,6 +158,10 @@ function setupEventListeners() {
 
     // Toggle Mark Scheme Action
     toggleMsBtn.addEventListener('click', toggleMarkSchemeVisibility);
+    toggleNotesBtn.addEventListener('click', toggleNotesVisibility);
+    
+    // Preprocess Syllabus selection
+    document.getElementById('preprocess-level').addEventListener('change', populatePreprocessBoards);
 }
 
 // ==========================================
@@ -257,6 +263,9 @@ async function selectPaper(paper) {
         if (paper.matched_mark_scheme) {
             msMatchSelect.value = paper.matched_mark_scheme;
         }
+        
+        // Populate boards for preprocess screen
+        populatePreprocessBoards();
     }
 }
 
@@ -276,9 +285,10 @@ async function loadMapping(paperName) {
         editMappingBtn.disabled = false;
         unmapPaperBtn.disabled = false;
         
-        // Mark scheme is hidden by default when loading a paper
+        // Mark scheme/notes are hidden by default when loading a paper
         state.showMarkScheme = false;
-        updateMarkSchemeVisibility();
+        state.showNotes = false;
+        updateSplitPanelDisplay();
         
         // Select first question automatically
         const keys = Object.keys(data.questions);
@@ -375,7 +385,14 @@ async function startAlignPaper() {
         return;
     }
     
-    showLoader('Running Local AI Alignment. Rendering pages and matching questions (this may take 5-10s)...');
+    const level = document.getElementById('preprocess-level').value;
+    const board = document.getElementById('preprocess-board').value;
+    if (!board) {
+        alert('Please select an Exam Board.');
+        return;
+    }
+    
+    showLoader('Running Local AI Alignment. Rendering pages, matching questions, and fetching notes (this may take 5-10s)...');
     try {
         const res = await fetch(`${API_URL}/api/process`, {
             method: 'POST',
@@ -383,7 +400,9 @@ async function startAlignPaper() {
             body: JSON.stringify({
                 subject: state.currentSubject,
                 paper_file: state.currentPaper.filename,
-                ms_file: msFile
+                ms_file: msFile,
+                board: board,
+                level: level
             })
         });
         const data = await res.json();
@@ -486,6 +505,11 @@ function selectQuestion(qKey) {
     // Reset panning layout
     resetPan('paper-panel');
     resetPan('ms-panel');
+    
+    // If notes are active, load notes for current question
+    if (state.showNotes) {
+        loadNotesForCurrentQuestion();
+    }
 }
 
 function addNewQuestionPrompt() {
@@ -518,7 +542,7 @@ function addNewQuestionPrompt() {
 // ==========================================
 // Manual Mapping Controls
 // ==========================================
-function openEditMappingModal() {
+async function openEditMappingModal() {
     if (!state.mapping || !state.currentQuestionKey) return;
     
     const qKey = state.currentQuestionKey;
@@ -530,6 +554,54 @@ function openEditMappingModal() {
     
     mappingPaperPages.value = qData.paper_pages.join(', ');
     mappingMsPages.value = qData.ms_pages.join(', ');
+    
+    // Clear and load notes index selection dropdown
+    const select = document.getElementById('mapping-note-url');
+    const customInput = document.getElementById('mapping-note-custom-url');
+    select.innerHTML = '<option value="">None / Custom</option>';
+    customInput.value = '';
+    
+    const board = state.mapping.board;
+    const level = state.mapping.level || 'a-level';
+    
+    if (board) {
+        select.innerHTML = '<option value="">Loading syllabus topics...</option>';
+        try {
+            const res = await fetch(`${API_URL}/api/notes_index?subject=${encodeURIComponent(state.currentSubject)}&board=${encodeURIComponent(board)}&level=${encodeURIComponent(level)}`);
+            const data = await res.json();
+            
+            select.innerHTML = '<option value="">None / Custom</option>';
+            if (data && data.length > 0) {
+                data.forEach(note => {
+                    const opt = document.createElement('option');
+                    opt.value = note.url;
+                    opt.textContent = note.title;
+                    select.appendChild(opt);
+                });
+            }
+        } catch (err) {
+            console.error('Error fetching notes index:', err);
+            select.innerHTML = '<option value="">Failed to load syllabus topics</option>';
+        }
+    } else {
+        select.innerHTML = '<option value="">Syllabus not configured for this paper</option>';
+    }
+    
+    // Select current note if mapped
+    if (qData.note_url) {
+        let found = false;
+        for (let opt of select.options) {
+            if (opt.value === qData.note_url) {
+                select.value = qData.note_url;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            customInput.value = qData.note_url;
+            select.value = '';
+        }
+    }
     
     openModal(editMappingModal);
 }
@@ -569,6 +641,19 @@ async function saveManualMapping() {
     const paperPages = parsePagesInput(paperVal, state.mapping.paper_total_pages);
     const msPages = parsePagesInput(msVal, state.mapping.ms_total_pages);
     
+    const select = document.getElementById('mapping-note-url');
+    const customInput = document.getElementById('mapping-note-custom-url');
+    
+    let noteUrl = select.value;
+    let noteTitle = null;
+    
+    if (customInput.value.trim()) {
+        noteUrl = customInput.value.trim();
+        noteTitle = 'Custom Linked Note';
+    } else if (noteUrl) {
+        noteTitle = select.options[select.selectedIndex].textContent;
+    }
+    
     // Update local state copy
     if (paperPages.length === 0 && msPages.length === 0) {
         // Delete question if both are empty
@@ -576,7 +661,9 @@ async function saveManualMapping() {
     } else {
         state.mapping.questions[qKey] = {
             paper_pages: paperPages,
-            ms_pages: msPages
+            ms_pages: msPages,
+            note_title: noteTitle,
+            note_url: noteUrl || null
         };
     }
     
@@ -729,21 +816,138 @@ function resetViewer() {
 
 function toggleMarkSchemeVisibility() {
     state.showMarkScheme = !state.showMarkScheme;
-    updateMarkSchemeVisibility();
+    if (state.showMarkScheme) {
+        state.showNotes = false;
+    }
+    updateSplitPanelDisplay();
 }
 
-function updateMarkSchemeVisibility() {
+function toggleNotesVisibility() {
+    state.showNotes = !state.showNotes;
+    if (state.showNotes) {
+        state.showMarkScheme = false;
+    }
+    updateSplitPanelDisplay();
+}
+
+function updateSplitPanelDisplay() {
     const msPanel = document.getElementById('ms-panel');
+    const msImageStack = document.getElementById('ms-image-stack');
+    const notesContainer = document.getElementById('notes-container');
+    const rightPanelTitle = document.getElementById('right-panel-title');
+    const msZoomControls = document.getElementById('ms-zoom-controls');
+    
+    const toggleMsBtn = document.getElementById('toggle-ms-btn');
+    const toggleNotesBtn = document.getElementById('toggle-notes-btn');
+    
     if (state.showMarkScheme) {
         splitScreen.style.gridTemplateColumns = '1fr 1fr';
         msPanel.style.display = 'flex';
+        
+        msImageStack.style.display = 'flex';
+        notesContainer.style.display = 'none';
+        msZoomControls.style.display = 'flex';
+        
+        rightPanelTitle.textContent = 'Mark Scheme';
+        
         toggleMsBtn.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Hide Mark Scheme';
         toggleMsBtn.classList.remove('show-state');
+        
+        toggleNotesBtn.innerHTML = '<i class="fa-solid fa-book-open"></i> Show Notes';
+        toggleNotesBtn.classList.add('show-state');
+        
+    } else if (state.showNotes) {
+        splitScreen.style.gridTemplateColumns = '1fr 1fr';
+        msPanel.style.display = 'flex';
+        
+        msImageStack.style.display = 'none';
+        notesContainer.style.display = 'block';
+        msZoomControls.style.display = 'none';
+        
+        rightPanelTitle.textContent = 'Revision Notes';
+        
+        toggleMsBtn.innerHTML = '<i class="fa-solid fa-eye"></i> Show Mark Scheme';
+        toggleMsBtn.classList.add('show-state');
+        
+        toggleNotesBtn.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Hide Notes';
+        toggleNotesBtn.classList.remove('show-state');
+        
+        loadNotesForCurrentQuestion();
+        
     } else {
         splitScreen.style.gridTemplateColumns = '1fr';
         msPanel.style.display = 'none';
+        
         toggleMsBtn.innerHTML = '<i class="fa-solid fa-eye"></i> Show Mark Scheme';
         toggleMsBtn.classList.add('show-state');
+        
+        toggleNotesBtn.innerHTML = '<i class="fa-solid fa-book-open"></i> Show Notes';
+        toggleNotesBtn.classList.add('show-state');
+    }
+}
+
+async function loadNotesForCurrentQuestion() {
+    const notesContainer = document.getElementById('notes-container');
+    if (!state.currentQuestionKey || !state.mapping) return;
+    
+    const qData = state.mapping.questions[state.currentQuestionKey];
+    if (!qData || !qData.note_url) {
+        notesContainer.innerHTML = '<div class="empty-state"><i class="fa-solid fa-unlink"></i><p>No revision notes linked to this question yet. Click "Edit Mapping" to link a subtopic.</p></div>';
+        return;
+    }
+    
+    notesContainer.innerHTML = '<div class="empty-state"><div class="loading-spinner" style="width:30px;height:30px;border-width:2px;"></div><p>Fetching revision notes...</p></div>';
+    
+    try {
+        const res = await fetch(`${API_URL}/api/note_content?url=${encodeURIComponent(qData.note_url)}`);
+        const data = await res.json();
+        
+        if (data.error) {
+            notesContainer.innerHTML = `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation" style="color:var(--color-danger)"></i><p>Failed to load note content:<br>${data.error}</p></div>`;
+        } else {
+            notesContainer.innerHTML = `
+                <div class="note-attribution" style="margin-bottom:15px; font-size:12px; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:8px;">
+                    <span>Linked: <strong>${qData.note_title || 'Revision Note'}</strong></span>
+                    <a href="${qData.note_url}" target="_blank" style="color:var(--accent-primary);text-decoration:none;"><i class="fa-solid fa-external-link"></i> Open on SaveMyExams</a>
+                </div>
+                ${data.content}
+            `;
+        }
+    } catch (err) {
+        console.error('Error fetching notes:', err);
+        notesContainer.innerHTML = '<div class="empty-state"><i class="fa-solid fa-wifi-off"></i><p>Network error loading revision notes.</p></div>';
+    }
+}
+
+function populatePreprocessBoards() {
+    const boardSelect = document.getElementById('preprocess-board');
+    const levelSelect = document.getElementById('preprocess-level');
+    
+    if (!pmtState.config || !state.currentSubject) return;
+    
+    const subjectKey = state.currentSubject.toLowerCase().replace(/\s+/g, '-');
+    const level = levelSelect.value;
+    
+    boardSelect.innerHTML = '';
+    const levelConfig = pmtState.config[level];
+    if (!levelConfig) return;
+    
+    const boards = levelConfig[subjectKey] || [];
+    
+    if (boards.length === 0) {
+        boardSelect.innerHTML = '<option value="" disabled selected>No boards configured</option>';
+        return;
+    }
+    
+    boards.forEach(board => {
+        const opt = document.createElement('option');
+        opt.value = board;
+        opt.textContent = formatPMTDisplayName(board);
+        boardSelect.appendChild(opt);
+    });
+    
+    if (boardSelect.options.length > 0) {
+        boardSelect.selectedIndex = 0;
     }
 }
 

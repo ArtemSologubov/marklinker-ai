@@ -1062,3 +1062,102 @@ code {
     cursor: not-allowed;
 }
 
+/* ==========================================
+   Phase 4: Revision Notes Styles
+   ========================================== */
+.notes-container {
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    font-size: 15px;
+}
+
+.notes-container h1, .notes-container h2, .notes-container h3, .notes-container h4 {
+    color: var(--text-primary);
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    font-weight: 700;
+}
+
+.notes-container h1 { font-size: 22px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
+.notes-container h2 { font-size: 18px; }
+.notes-container h3 { font-size: 16px; }
+
+.notes-container p {
+    margin-bottom: 1em;
+}
+
+.notes-container ul, .notes-container ol {
+    margin-bottom: 1em;
+    padding-left: 20px;
+}
+
+.notes-container li {
+    margin-bottom: 0.5em;
+}
+
+/* Save My Exams tables styling */
+.notes-container table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5em 0;
+    font-size: 14px;
+}
+
+.notes-container th, .notes-container td {
+    border: 1px solid var(--border-color);
+    padding: 10px 12px;
+    text-align: left;
+}
+
+.notes-container th {
+    background-color: var(--bg-tertiary);
+    font-weight: 600;
+}
+
+.notes-container tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.dark-theme .notes-container tr:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.light-theme .notes-container tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Save My Exams images/worked examples styling */
+.notes-container img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1.5em auto;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    background-color: white; /* Ensure images with transparent backgrounds are readable in dark mode */
+    padding: 8px;
+}
+
+/* Worked examples/exam tips styling */
+.notes-container div[class*="Card_card"],
+.notes-container div[class*="bg-body-secondary"],
+.notes-container .bg-body-secondary {
+    background-color: var(--bg-tertiary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: var(--border-radius-md);
+    padding: 16px;
+    margin: 1.5em 0;
+}
+
+/* Text coloring inside cards */
+.notes-container .text-muted,
+.notes-container span[class*="text-muted"] {
+    color: var(--text-secondary) !important;
+}
+
+.notes-container span[class*="MathJax"], .notes-container .math {
+    color: var(--text-primary);
+}
+
