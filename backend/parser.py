@@ -166,103 +166,105 @@ def map_paper_and_ms(subject, paper_name, paper_path, ms_path, cache_dir, board=
     
     # 1. Parse Paper
     paper_doc = fitz.open(paper_path)
-    paper_num_pages = len(paper_doc)
-    paper_candidates = []
-    
-    for p_idx in range(paper_num_pages):
-        page = paper_doc[p_idx]
-        # Ignore page 1 of the paper (cover/title page) to prevent false matches
-        if p_idx == 0:
-            cands = []
-        else:
-            cands = extract_candidates(page, p_idx + 1)
-        paper_candidates.append(cands)
-        
-        # Render page as image
-        pix = page.get_pixmap(dpi=150)
-        img_path = os.path.join(paper_cache_dir, f"page_{p_idx + 1}.png")
-        pix.save(img_path)
-        
-    paper_starts = solve_sequence(paper_candidates)
-    paper_ranges = generate_page_ranges(paper_starts, paper_num_pages, paper_candidates)
-    
-    # 2. Parse Mark Scheme
     ms_doc = fitz.open(ms_path)
-    ms_num_pages = len(ms_doc)
-    ms_candidates = []
     
-    for p_idx in range(ms_num_pages):
-        page = ms_doc[p_idx]
-        # Ignore page 1 of the mark scheme (cover/title page) to prevent false matches
-        if p_idx == 0:
-            cands = []
+    try:
+        paper_num_pages = len(paper_doc)
+        paper_candidates = []
+        
+        for p_idx in range(paper_num_pages):
+            page = paper_doc[p_idx]
+            # Ignore page 1 of the paper (cover/title page) to prevent false matches
+            if p_idx == 0:
+                cands = []
+            else:
+                cands = extract_candidates(page, p_idx + 1)
+            paper_candidates.append(cands)
+            
+            # Render page as image
+            pix = page.get_pixmap(dpi=150)
+            img_path = os.path.join(paper_cache_dir, f"page_{p_idx + 1}.png")
+            pix.save(img_path)
+            
+        paper_starts = solve_sequence(paper_candidates)
+        paper_ranges = generate_page_ranges(paper_starts, paper_num_pages, paper_candidates)
+        
+        # 2. Parse Mark Scheme
+        ms_num_pages = len(ms_doc)
+        ms_candidates = []
+        
+        for p_idx in range(ms_num_pages):
+            page = ms_doc[p_idx]
+            # Ignore page 1 of the mark scheme (cover/title page) to prevent false matches
+            if p_idx == 0:
+                cands = []
+            else:
+                cands = extract_candidates(page, p_idx + 1)
+            ms_candidates.append(cands)
+            
+            # Render page as image
+            pix = page.get_pixmap(dpi=150)
+            img_path = os.path.join(ms_cache_dir, f"page_{p_idx + 1}.png")
+            pix.save(img_path)
+            
+        ms_starts = solve_sequence(ms_candidates)
+        ms_ranges = generate_page_ranges(ms_starts, ms_num_pages, ms_candidates)
+        
+        # 3. Align Paper Questions and MS Questions
+        # We prioritize paper questions as the source of truth to avoid false positives at the end of mark schemes.
+        # We fallback to MS questions if no questions were detected in the paper.
+        questions_map = {}
+        if paper_ranges:
+            all_qs = set(paper_ranges.keys())
         else:
-            cands = extract_candidates(page, p_idx + 1)
-        ms_candidates.append(cands)
+            all_qs = set(ms_ranges.keys())
+            
+        # Sort them numerically
+        sorted_qs = sorted(list(all_qs), key=lambda x: int(x) if x.isdigit() else 999)
         
-        # Render page as image
-        pix = page.get_pixmap(dpi=150)
-        img_path = os.path.join(ms_cache_dir, f"page_{p_idx + 1}.png")
-        pix.save(img_path)
+        # Get or crawl revision notes index if board & level are provided
+        notes = []
+        if board and level:
+            notes = get_or_crawl_notes_index(subject, board, level, cache_dir)
         
-    ms_starts = solve_sequence(ms_candidates)
-    ms_ranges = generate_page_ranges(ms_starts, ms_num_pages, ms_candidates)
-    
-    # 3. Align Paper Questions and MS Questions
-    # We prioritize paper questions as the source of truth to avoid false positives at the end of mark schemes.
-    # We fallback to MS questions if no questions were detected in the paper.
-    questions_map = {}
-    if paper_ranges:
-        all_qs = set(paper_ranges.keys())
-    else:
-        all_qs = set(ms_ranges.keys())
-        
-    # Sort them numerically
-    sorted_qs = sorted(list(all_qs), key=lambda x: int(x) if x.isdigit() else 999)
-    
-    # Get or crawl revision notes index if board & level are provided
-    notes = []
-    if board and level:
-        notes = get_or_crawl_notes_index(subject, board, level, cache_dir)
-    
-    for q in sorted_qs:
-        # Extract text for this question to auto-match notes
-        q_text = ""
-        q_pages = paper_ranges.get(q, [])
-        for p in q_pages:
-            if 0 < p <= len(paper_doc):
-                q_text += paper_doc[p-1].get_text()
-                
-        best_note, score = find_best_revision_note_match(q_text, notes)
-        
-        questions_map[q] = {
-            "paper_pages": q_pages,
-            "ms_pages": ms_ranges.get(q, []),
-            "note_title": best_note["title"] if best_note else None,
-            "note_url": best_note["url"] if best_note else None
+        for q in sorted_qs:
+            # Extract text for this question to auto-match notes
+            q_text = ""
+            q_pages = paper_ranges.get(q, [])
+            for p in q_pages:
+                if 0 < p <= len(paper_doc):
+                    q_text += paper_doc[p-1].get_text()
+                    
+            best_note, score = find_best_revision_note_match(q_text, notes)
+            
+            questions_map[q] = {
+                "paper_pages": q_pages,
+                "ms_pages": ms_ranges.get(q, []),
+                "note_title": best_note["title"] if best_note else None,
+                "note_url": best_note["url"] if best_note else None
+            }
+            
+        # Metadata summary
+        metadata = {
+            "subject": subject,
+            "paper_name": paper_name,
+            "paper_total_pages": paper_num_pages,
+            "ms_total_pages": ms_num_pages,
+            "board": board,
+            "level": level,
+            "questions": questions_map
         }
         
-    # Metadata summary
-    metadata = {
-        "subject": subject,
-        "paper_name": paper_name,
-        "paper_total_pages": paper_num_pages,
-        "ms_total_pages": ms_num_pages,
-        "board": board,
-        "level": level,
-        "questions": questions_map
-    }
-    
-    # Save mapping metadata
-    meta_path = os.path.join(cache_dir, subject, paper_name, "mapping.json")
-    os.makedirs(os.path.dirname(meta_path), exist_ok=True)
-    with open(meta_path, "w") as f:
-        json.dump(metadata, f, indent=2)
-        
-    paper_doc.close()
-    ms_doc.close()
-    
-    return metadata
+        # Save mapping metadata
+        meta_path = os.path.join(cache_dir, subject, paper_name, "mapping.json")
+        os.makedirs(os.path.dirname(meta_path), exist_ok=True)
+        with open(meta_path, "w") as f:
+            json.dump(metadata, f, indent=2)
+            
+        return metadata
+    finally:
+        paper_doc.close()
+        ms_doc.close()
 
 def get_or_crawl_notes_index(subject, board, level, cache_dir):
     subj_folder = os.path.join(cache_dir, subject)

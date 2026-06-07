@@ -275,11 +275,28 @@ def unprocess_paper():
     paper_cache_dir = os.path.join(CACHE_DIR, subject, paper_name)
     if os.path.exists(paper_cache_dir):
         import shutil
+        import uuid
+        import time
+        
+        # Try direct deletion with retry
+        for attempt in range(3):
+            try:
+                shutil.rmtree(paper_cache_dir)
+                return jsonify({"success": True, "message": "Paper cache reset successfully"})
+            except Exception:
+                time.sleep(0.1)
+                
+        # If direct deletion fails (locked files on Windows), use the rename trick
         try:
-            shutil.rmtree(paper_cache_dir)
+            temp_dir = os.path.join(CACHE_DIR, subject, f"{paper_name}_deleted_{uuid.uuid4().hex}")
+            os.rename(paper_cache_dir, temp_dir)
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception:
+                pass # Silently ignore deletion failure for the renamed temp directory
             return jsonify({"success": True, "message": "Paper cache reset successfully"})
         except Exception as e:
-            return jsonify({"error": f"Failed to delete paper cache: {str(e)}"}), 500
+            return jsonify({"error": f"Failed to reset paper: {str(e)}"}), 500
     else:
         return jsonify({"success": True, "message": "Paper is already unmapped"})
 
