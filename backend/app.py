@@ -1,14 +1,25 @@
 import os
+import sys
 import json
 import re
 from flask import Flask, jsonify, request, send_from_directory, send_file
 from flask_cors import CORS
 from parser import map_paper_and_ms
 
-app = Flask(__name__, static_folder="../frontend", static_url_path="")
-CORS(app)  # Enable CORS for development flexibility
+# ── PyInstaller / development path resolution ─────────────────────────────────
+if getattr(sys, 'frozen', False):
+    # Running as PyInstaller bundle
+    BASE_DIR  = os.path.dirname(sys.executable)   # folder containing MarkLinkerAI.exe
+    _FRONTEND = os.path.join(sys._MEIPASS, 'frontend')  # bundled static files
+else:
+    # Normal development run
+    BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _FRONTEND = os.path.join(BASE_DIR, 'frontend')
+# ─────────────────────────────────────────────────────────────────────────────
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+app = Flask(__name__, static_folder=_FRONTEND, static_url_path="")
+CORS(app)
+
 SUBJECTS_DIR = os.path.join(BASE_DIR, "subjects")
 CACHE_DIR = os.path.join(BASE_DIR, "cache")
 
