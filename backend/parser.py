@@ -164,9 +164,19 @@ def map_paper_and_ms(subject, paper_name, paper_path, ms_path, cache_dir, board=
     os.makedirs(paper_cache_dir, exist_ok=True)
     os.makedirs(ms_cache_dir, exist_ok=True)
     
-    # 1. Parse Paper
-    paper_doc = fitz.open(paper_path)
-    ms_doc = fitz.open(ms_path)
+    # Copy source PDFs to cache directory if they don't exist yet
+    cached_paper_pdf = os.path.join(cache_dir, subject, paper_name, "annotated_paper.pdf")
+    cached_ms_pdf = os.path.join(cache_dir, subject, paper_name, "annotated_ms.pdf")
+    
+    import shutil
+    if not os.path.exists(cached_paper_pdf):
+        shutil.copy2(paper_path, cached_paper_pdf)
+    if not os.path.exists(cached_ms_pdf):
+        shutil.copy2(ms_path, cached_ms_pdf)
+        
+    # 1. Parse Paper from Cache copies
+    paper_doc = fitz.open(cached_paper_pdf)
+    ms_doc = fitz.open(cached_ms_pdf)
     
     try:
         paper_num_pages = len(paper_doc)

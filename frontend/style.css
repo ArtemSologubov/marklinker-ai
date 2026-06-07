@@ -1161,3 +1161,154 @@ code {
     color: var(--text-primary);
 }
 
+
+/* ==========================================
+   Phase 5: Drawing Tools & Toolbar Styles
+   ========================================== */
+.drawing-toolbar {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: rgba(30, 30, 40, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--border-radius-lg);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    transition: all 0.3s ease;
+}
+
+.light-theme .drawing-toolbar {
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+}
+
+.toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toolbar-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--border-radius-sm);
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.toolbar-btn:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.light-theme .toolbar-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.toolbar-btn.active {
+    background-color: var(--accent-primary);
+    color: white;
+}
+
+.toolbar-divider {
+    width: 1px;
+    height: 20px;
+    background-color: var(--border-color);
+}
+
+/* Color swatches */
+.color-section {
+    gap: 8px;
+}
+
+.color-swatch {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.color-swatch:hover {
+    transform: scale(1.15);
+}
+
+.color-swatch.active {
+    border-color: var(--text-primary);
+    transform: scale(1.15);
+}
+
+#draw-color-picker {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0;
+    overflow: hidden;
+}
+
+#draw-color-picker::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+#draw-color-picker::-webkit-color-swatch {
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+}
+
+/* Page wrapper and drawing canvas */
+.page-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 20px;
+    cursor: default;
+}
+
+.page-wrapper img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+.drawing-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* select mode is default */
+    z-index: 10;
+}
+
+/* Text Tool Overlay Input */
+.canvas-text-input {
+    position: absolute;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--border-radius-xs);
+    padding: 4px 8px;
+    font-family: inherit;
+    box-shadow: var(--shadow-sm);
+    z-index: 20;
+    outline: none;
+}
+
+

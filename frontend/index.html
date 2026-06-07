@@ -149,6 +149,33 @@
                 </div>
             </div>
 
+            <!-- Floating Drawing Toolbar -->
+            <div id="drawing-toolbar" class="drawing-toolbar" style="display: none;">
+                <div class="toolbar-section">
+                    <button id="draw-tool-select" class="toolbar-btn active" title="Select / Pan (Grab Scroll)"><i class="fa-solid fa-hand"></i></button>
+                    <button id="draw-tool-pen" class="toolbar-btn" title="Pen Tool (Freehand)"><i class="fa-solid fa-pen"></i></button>
+                    <button id="draw-tool-line" class="toolbar-btn" title="Line Tool"><i class="fa-solid fa-minus"></i></button>
+                    <button id="draw-tool-rect" class="toolbar-btn" title="Rectangle Tool"><i class="fa-regular fa-square"></i></button>
+                    <button id="draw-tool-circle" class="toolbar-btn" title="Circle Tool"><i class="fa-regular fa-circle"></i></button>
+                    <button id="draw-tool-text" class="toolbar-btn" title="Text Tool"><i class="fa-solid fa-font"></i></button>
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-section color-section">
+                    <span class="color-swatch active" style="background-color: #ff0000;" data-color="#ff0000" title="Red"></span>
+                    <span class="color-swatch" style="background-color: #0000ff;" data-color="#0000ff" title="Blue"></span>
+                    <span class="color-swatch" style="background-color: #00aa00;" data-color="#00aa00" title="Green"></span>
+                    <span class="color-swatch" style="background-color: #000000;" data-color="#000000" title="Black"></span>
+                    <span class="color-swatch" style="background-color: #ffcc00;" data-color="#ffcc00" title="Yellow"></span>
+                    <input type="color" id="draw-color-picker" value="#ff0000" title="Custom Color">
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-section size-section" style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-sliders" style="font-size: 12px; opacity: 0.7;"></i>
+                    <input type="range" id="draw-size-slider" min="1" max="15" value="3" title="Size (Pen / Shape / Font Size)" style="width: 70px;">
+                    <span id="draw-size-value" style="font-size: 11px; min-width: 25px; text-align: center; font-weight: 600;">3px</span>
+                </div>
+            </div>
+
             <!-- Pre-process Setup Screen -->
             <div id="preprocess-screen" class="preprocess-screen" style="display: none;">
                 <div class="preprocess-card">

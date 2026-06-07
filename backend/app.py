@@ -300,6 +300,110 @@ def unprocess_paper():
     else:
         return jsonify({"success": True, "message": "Paper is already unmapped"})
 
+@app.route("/api/drawing/add", methods=["POST"])
+def add_drawing_annotation():
+    data = request.json
+    subject = data.get("subject")
+    paper_name = data.get("paper_name")
+    page_type = data.get("page_type") # "paper" or "ms"
+    page_num = data.get("page_num") # 1-indexed
+    tool = data.get("tool") # "pen" / "line" / "rect" / "circle" / "text"
+    color = data.get("color", "#ff0000")
+    size = data.get("size", 3)
+    points = data.get("points", []) # list of [x_ratio, y_ratio]
+    text = data.get("text", "")
+    
+    if not subject or not paper_name or not page_type or not page_num or not tool:
+        return jsonify({"error": "Missing required parameters"}), 400
+        
+    pdf_filename = "annotated_paper.pdf" if page_type == "paper" else "annotated_ms.pdf"
+    pdf_path = os.path.join(CACHE_DIR, subject, paper_name, pdf_filename)
+    
+    if not os.path.exists(pdf_path):
+        return jsonify({"error": "Annotated PDF not found. Please align the paper first."}), 404
+        
+    import fitz
+    try:
+        doc = fitz.open(pdf_path)
+        p_idx = int(page_num) - 1
+        if p_idx < 0 or p_idx >= len(doc):
+            doc.close()
+            return jsonify({"error": "Invalid page number"}), 400
+            
+        page = doc[p_idx]
+        w_pdf = page.rect.width
+        h_pdf = page.rect.height
+        
+        def parse_hex_color(hex_val):
+            hex_val = hex_val.lstrip('#')
+            if len(hex_val) == 6:
+                return tuple(int(hex_val[i:i+2], 16) / 255.0 for i in (0, 2, 4))
+            return (1.0, 0.0, 0.0) # default red
+            
+        rgb_color = parse_hex_color(color)
+        
+        if tool == "pen":
+            if len(points) >= 2:
+                for i in range(len(points) - 1):
+                    p1 = fitz.Point(points[i][0] * w_pdf, points[i][1] * h_pdf)
+                    p2 = fitz.Point(points[i+1][0] * w_pdf, points[i+1][1] * h_pdf)
+                    page.draw_line(p1, p2, color=rgb_color, width=float(size))
+        elif tool == "line":
+            if len(points) >= 2:
+                p1 = fitz.Point(points[0][0] * w_pdf, points[0][1] * h_pdf)
+                p2 = fitz.Point(points[1][0] * w_pdf, points[1][1] * h_pdf)
+                page.draw_line(p1, p2, color=rgb_color, width=float(size))
+        elif tool == "rect":
+            if len(points) >= 2:
+                x0 = min(points[0][0], points[1][0]) * w_pdf
+                y0 = min(points[0][1], points[1][1]) * h_pdf
+                x1 = max(points[0][0], points[1][0]) * w_pdf
+                y1 = max(points[0][1], points[1][1]) * h_pdf
+                rect = fitz.Rect(x0, y0, x1, y1)
+                page.draw_rect(rect, color=rgb_color, width=float(size))
+        elif tool == "circle":
+            if len(points) >= 2:
+                cx, cy = points[0][0] * w_pdf, points[0][1] * h_pdf
+                ex, ey = points[1][0] * w_pdf, points[1][1] * h_pdf
+                center = fitz.Point(cx, cy)
+                edge = fitz.Point(ex, ey)
+                radius = center.distance_to(edge)
+                page.draw_circle(center, radius, color=rgb_color, width=float(size))
+        elif tool == "text":
+            if len(points) >= 1:
+                point = fitz.Point(points[0][0] * w_pdf, points[0][1] * h_pdf)
+                page.insert_text(point, text, fontsize=float(size), color=rgb_color)
+                
+        # Save modifications safely
+        try:
+            doc.save(doc.name, incremental=True)
+            doc.close()
+        except Exception:
+            # Fallback if incremental save is blocked
+            temp_save_path = pdf_path + ".tmp"
+            try:
+                doc.save(temp_save_path)
+                doc.close()
+                import shutil
+                shutil.move(temp_save_path, pdf_path)
+            except Exception as e_inner:
+                doc.close()
+                raise e_inner
+        
+        # Re-render only this modified page to PNG in cache
+        doc_render = fitz.open(pdf_path)
+        page_render = doc_render[p_idx]
+        pix = page_render.get_pixmap(dpi=150)
+        
+        cache_subfolder = "paper" if page_type == "paper" else "mark_scheme"
+        img_path = os.path.join(CACHE_DIR, subject, paper_name, cache_subfolder, f"page_{page_num}.png")
+        pix.save(img_path)
+        doc_render.close()
+        
+        return jsonify({"success": True, "message": "Drawing saved successfully"})
+    except Exception as e:
+        return jsonify({"error": f"Failed to save drawing to PDF: {str(e)}"}), 500
+
 @app.route("/api/notes_index", methods=["GET"])
 def get_notes_index_endpoint():
     subject = request.args.get("subject")

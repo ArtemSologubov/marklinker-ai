@@ -15,7 +15,12 @@ let state = {
         ms: 1.0
     },
     showMarkScheme: false, // default to hidden
-    showNotes: false // default to hidden
+    showNotes: false, // default to hidden
+    drawingMode: {
+        tool: 'select',
+        color: '#ff0000',
+        size: 3
+    }
 };
 
 // DOM Elements
@@ -41,6 +46,7 @@ const startAlignBtn = document.getElementById('start-align-btn');
 const unmapPaperBtn = document.getElementById('unmap-paper-btn');
 const toggleMsBtn = document.getElementById('toggle-ms-btn');
 const toggleNotesBtn = document.getElementById('toggle-notes-btn');
+const drawingToolbar = document.getElementById('drawing-toolbar');
 
 const splitScreen = document.getElementById('split-screen');
 const currentQNum = document.getElementById('current-q-num');
@@ -76,6 +82,7 @@ function initApp() {
     setupZoomAndPan('paper-panel');
     setupZoomAndPan('ms-panel');
     initPMTDownloader();
+    initDrawingToolbar();
 }
 
 function setupEventListeners() {
@@ -282,6 +289,7 @@ async function loadMapping(paperName) {
         questionsEmptyState.style.display = 'none';
         questionsList.style.display = 'flex';
         splitScreen.style.display = 'grid';
+        if (drawingToolbar) drawingToolbar.style.display = 'flex';
         editMappingBtn.disabled = false;
         unmapPaperBtn.disabled = false;
         
@@ -480,10 +488,8 @@ function selectQuestion(qKey) {
     paperImageStack.innerHTML = '';
     if (qData.paper_pages.length > 0) {
         qData.paper_pages.forEach(pNum => {
-            const img = document.createElement('img');
-            img.src = `${API_URL}/api/page/paper/${encodeURIComponent(state.currentSubject)}/${encodeURIComponent(state.currentPaper.name)}/${pNum}?t=${new Date().getTime()}`;
-            img.alt = `Question Page ${pNum}`;
-            paperImageStack.appendChild(img);
+            const wrapper = createPageWithCanvas('paper', pNum);
+            paperImageStack.appendChild(wrapper);
         });
     } else {
         paperImageStack.innerHTML = '<div class="empty-state"><i class="fa-solid fa-file-excel"></i><p>No paper pages mapped to this question</p></div>';
@@ -493,10 +499,8 @@ function selectQuestion(qKey) {
     msImageStack.innerHTML = '';
     if (qData.ms_pages.length > 0) {
         qData.ms_pages.forEach(pNum => {
-            const img = document.createElement('img');
-            img.src = `${API_URL}/api/page/ms/${encodeURIComponent(state.currentSubject)}/${encodeURIComponent(state.currentPaper.name)}/${pNum}?t=${new Date().getTime()}`;
-            img.alt = `Mark Scheme Page ${pNum}`;
-            msImageStack.appendChild(img);
+            const wrapper = createPageWithCanvas('ms', pNum);
+            msImageStack.appendChild(wrapper);
         });
     } else {
         msImageStack.innerHTML = '<div class="empty-state"><i class="fa-solid fa-file-excel"></i><p>No mark scheme pages mapped to this question</p></div>';
@@ -801,6 +805,7 @@ function closeModal(modalEl) {
 function resetViewer() {
     preprocessScreen.style.display = 'none';
     splitScreen.style.display = 'none';
+    if (drawingToolbar) drawingToolbar.style.display = 'none';
     questionsList.style.display = 'none';
     questionsEmptyState.style.display = 'flex';
     editMappingBtn.disabled = true;
@@ -1326,5 +1331,311 @@ async function initPMTDownloader() {
         const count = pmtState.selectedPapers.length;
         pmtSelectedCount.textContent = count;
         submitPmtDownloadBtn.disabled = count === 0;
+    }
+}
+
+// ==========================================
+// Phase 5: PDF Drawing Persistent Engine
+// ==========================================
+function initDrawingToolbar() {
+    const tools = ['select', 'pen', 'line', 'rect', 'circle', 'text'];
+    
+    // 1. Tool Selection Listeners
+    tools.forEach(tool => {
+        const btn = document.getElementById(`draw-tool-${tool}`);
+        if (btn) {
+            btn.addEventListener('click', () => {
+                // Remove active class from all tool buttons
+                tools.forEach(t => {
+                    const b = document.getElementById(`draw-tool-${t}`);
+                    if (b) b.classList.remove('active');
+                });
+                // Set active class
+                btn.classList.add('active');
+                state.drawingMode.tool = tool;
+                
+                // Update slider step/min/max/labels based on tool type
+                const slider = document.getElementById('draw-size-slider');
+                const valLabel = document.getElementById('draw-size-value');
+                if (tool === 'text') {
+                    slider.min = 12;
+                    slider.max = 36;
+                    slider.value = 18;
+                    valLabel.textContent = '18pt';
+                    state.drawingMode.size = 18;
+                } else {
+                    slider.min = 1;
+                    slider.max = 15;
+                    slider.value = 3;
+                    valLabel.textContent = '3px';
+                    state.drawingMode.size = 3;
+                }
+                
+                updateCanvasPointerEvents();
+            });
+        }
+    });
+    
+    // 2. Color Swatches Selection
+    const swatches = document.querySelectorAll('.color-section .color-swatch');
+    const picker = document.getElementById('draw-color-picker');
+    
+    swatches.forEach(swatch => {
+        swatch.addEventListener('click', () => {
+            swatches.forEach(s => s.classList.remove('active'));
+            swatch.classList.add('active');
+            
+            const color = swatch.dataset.color;
+            state.drawingMode.color = color;
+            if (picker) picker.value = color;
+        });
+    });
+    
+    // 3. Custom Color Picker Change
+    if (picker) {
+        picker.addEventListener('input', (e) => {
+            swatches.forEach(s => s.classList.remove('active'));
+            state.drawingMode.color = e.target.value;
+        });
+    }
+    
+    // 4. Size Slider Change
+    const sizeSlider = document.getElementById('draw-size-slider');
+    const sizeValue = document.getElementById('draw-size-value');
+    if (sizeSlider && sizeValue) {
+        sizeSlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            state.drawingMode.size = parseInt(val);
+            sizeValue.textContent = state.drawingMode.tool === 'text' ? `${val}pt` : `${val}px`;
+        });
+    }
+}
+
+function updateCanvasPointerEvents() {
+    const canvases = document.querySelectorAll('.drawing-canvas');
+    canvases.forEach(canvas => {
+        canvas.style.pointerEvents = state.drawingMode.tool === 'select' ? 'none' : 'auto';
+    });
+}
+
+function createPageWithCanvas(pageType, pageNum) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'page-wrapper';
+    wrapper.dataset.pageType = pageType;
+    wrapper.dataset.pageNum = pageNum;
+    
+    const img = document.createElement('img');
+    img.src = `${API_URL}/api/page/${pageType}/${encodeURIComponent(state.currentSubject)}/${encodeURIComponent(state.currentPaper.name)}/${pageNum}?t=${new Date().getTime()}`;
+    img.alt = `${pageType === 'paper' ? 'Question' : 'Mark Scheme'} Page ${pageNum}`;
+    
+    const canvas = document.createElement('canvas');
+    canvas.className = 'drawing-canvas';
+    canvas.style.pointerEvents = state.drawingMode.tool === 'select' ? 'none' : 'auto';
+    
+    wrapper.appendChild(img);
+    wrapper.appendChild(canvas);
+    
+    img.onload = () => {
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+    };
+    
+    setupCanvasDrawingEvents(wrapper, canvas, pageType, pageNum);
+    
+    return wrapper;
+}
+
+function setupCanvasDrawingEvents(wrapper, canvas, pageType, pageNum) {
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+    let startX = 0, startY = 0;
+    let points = [];
+    
+    function getCanvasCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        // Scale client coordinates to canvas internal pixel dimensions
+        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        return { x, y };
+    }
+    
+    canvas.addEventListener('mousedown', (e) => {
+        if (state.drawingMode.tool === 'select') return;
+        
+        isDrawing = true;
+        const coords = getCanvasCoords(e);
+        startX = coords.x;
+        startY = coords.y;
+        
+        if (state.drawingMode.tool === 'text') {
+            isDrawing = false;
+            showTextInputOverlay(wrapper, canvas, e, coords.x, coords.y, pageType, pageNum);
+            return;
+        }
+        
+        points = [[coords.x, coords.y]];
+    });
+    
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDrawing) return;
+        
+        const coords = getCanvasCoords(e);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.strokeStyle = state.drawingMode.color;
+        ctx.lineWidth = state.drawingMode.size;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        const tool = state.drawingMode.tool;
+        
+        if (tool === 'pen') {
+            if (e.shiftKey) {
+                // Draw straight line from start
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(coords.x, coords.y);
+                ctx.stroke();
+            } else {
+                points.push([coords.x, coords.y]);
+                ctx.beginPath();
+                ctx.moveTo(points[0][0], points[0][1]);
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i][0], points[i][1]);
+                }
+                ctx.stroke();
+            }
+        } else if (tool === 'line') {
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(coords.x, coords.y);
+            ctx.stroke();
+        } else if (tool === 'rect') {
+            ctx.beginPath();
+            ctx.rect(startX, startY, coords.x - startX, coords.y - startY);
+            ctx.stroke();
+        } else if (tool === 'circle') {
+            const radius = Math.sqrt(Math.pow(coords.x - startX, 2) + Math.pow(coords.y - startY, 2));
+            ctx.beginPath();
+            ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+            ctx.stroke();
+        }
+    });
+    
+    const endDrawing = async (e) => {
+        if (!isDrawing) return;
+        isDrawing = false;
+        
+        const coords = getCanvasCoords(e);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const tool = state.drawingMode.tool;
+        let pointsRatios = [];
+        
+        if (tool === 'pen') {
+            if (e.shiftKey) {
+                pointsRatios = [
+                    [startX / canvas.width, startY / canvas.height],
+                    [coords.x / canvas.width, coords.y / canvas.height]
+                ];
+            } else {
+                if (points.length < 2) return;
+                pointsRatios = points.map(pt => [pt[0] / canvas.width, pt[1] / canvas.height]);
+            }
+        } else if (tool === 'line' || tool === 'rect' || tool === 'circle') {
+            pointsRatios = [
+                [startX / canvas.width, startY / canvas.height],
+                [coords.x / canvas.width, coords.y / canvas.height]
+            ];
+        } else {
+            return;
+        }
+        
+        await commitDrawingToBackend(wrapper, pageType, pageNum, {
+            tool: tool,
+            color: state.drawingMode.color,
+            size: state.drawingMode.size,
+            points: pointsRatios
+        });
+    };
+    
+    canvas.addEventListener('mouseup', endDrawing);
+    canvas.addEventListener('mouseleave', endDrawing);
+}
+
+function showTextInputOverlay(wrapper, canvas, e, canvasX, canvasY, pageType, pageNum) {
+    if (wrapper.querySelector('.canvas-text-input')) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'canvas-text-input';
+    
+    input.style.left = `${e.clientX - rect.left}px`;
+    input.style.top = `${e.clientY - rect.top - 10}px`;
+    input.style.fontSize = `${state.drawingMode.size}px`;
+    input.style.color = state.drawingMode.color;
+    input.style.border = `1px solid ${state.drawingMode.color}`;
+    
+    wrapper.appendChild(input);
+    input.focus();
+    
+    const submitText = async () => {
+        const textVal = input.value.trim();
+        if (textVal) {
+            const startRatioX = canvasX / canvas.width;
+            const startRatioY = canvasY / canvas.height;
+            
+            await commitDrawingToBackend(wrapper, pageType, pageNum, {
+                tool: 'text',
+                color: state.drawingMode.color,
+                size: state.drawingMode.size,
+                points: [[startRatioX, startRatioY]],
+                text: textVal
+            });
+        }
+        input.remove();
+    };
+    
+    input.addEventListener('keydown', (evt) => {
+        if (evt.key === 'Enter') submitText();
+        if (evt.key === 'Escape') input.remove();
+    });
+    
+    input.addEventListener('blur', submitText);
+}
+
+async function commitDrawingToBackend(wrapper, pageType, pageNum, drawingData) {
+    showLoader('Saving drawing annotation...');
+    try {
+        const res = await fetch(`${API_URL}/api/drawing/add`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                subject: state.currentSubject,
+                paper_name: state.currentPaper.name,
+                page_type: pageType,
+                page_num: pageNum,
+                tool: drawingData.tool,
+                color: drawingData.color,
+                size: drawingData.size,
+                points: drawingData.points,
+                text: drawingData.text || ''
+            })
+        });
+        
+        const data = await res.json();
+        if (data.success) {
+            const img = wrapper.querySelector('img');
+            const baseUrl = img.src.split('?')[0];
+            img.src = `${baseUrl}?t=${new Date().getTime()}`;
+        } else {
+            alert(data.error || 'Failed to save drawing');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('An error occurred while saving the drawing.');
+    } finally {
+        hideLoader();
     }
 }
