@@ -1020,3 +1020,45 @@ code {
     margin-bottom: 12px;
 }
 
+/* ==========================================
+   Phase 3: Toggle MS Button Styles
+   ========================================== */
+.toggle-ms-btn {
+    background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+    color: #ffffff;
+    border: none;
+    padding: 6px 12px;
+    border-radius: var(--border-radius-sm);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity var(--transition-speed) ease, background-color var(--transition-speed) ease;
+    box-shadow: var(--shadow-sm);
+}
+
+.toggle-ms-btn:hover {
+    opacity: 0.9;
+}
+
+.toggle-ms-btn.show-state {
+    background: none;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    box-shadow: none;
+}
+
+.toggle-ms-btn.show-state:hover {
+    background-color: var(--border-highlight);
+    color: var(--text-primary);
+}
+
+.toggle-ms-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+

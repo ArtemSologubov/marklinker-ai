@@ -13,7 +13,8 @@ let state = {
     zoom: {
         paper: 1.0,
         ms: 1.0
-    }
+    },
+    showMarkScheme: false // default to hidden
 };
 
 // DOM Elements
@@ -36,6 +37,8 @@ const loadingText = document.getElementById('loading-text');
 const preprocessScreen = document.getElementById('preprocess-screen');
 const msMatchSelect = document.getElementById('ms-match-select');
 const startAlignBtn = document.getElementById('start-align-btn');
+const unmapPaperBtn = document.getElementById('unmap-paper-btn');
+const toggleMsBtn = document.getElementById('toggle-ms-btn');
 
 const splitScreen = document.getElementById('split-screen');
 const currentQNum = document.getElementById('current-q-num');
@@ -147,6 +150,12 @@ function setupEventListeners() {
     // Edit Mapping Modal Action
     editMappingBtn.addEventListener('click', openEditMappingModal);
     submitMappingBtn.addEventListener('click', saveManualMapping);
+
+    // Reset Mapping / Unprocess Action
+    unmapPaperBtn.addEventListener('click', resetPaperMapping);
+
+    // Toggle Mark Scheme Action
+    toggleMsBtn.addEventListener('click', toggleMarkSchemeVisibility);
 }
 
 // ==========================================
@@ -233,6 +242,7 @@ async function selectPaper(paper) {
     resetViewer();
     
     if (paper.processed) {
+        unmapPaperBtn.disabled = false;
         loadMapping(paper.name);
     } else {
         // Show preprocess wizard screen
@@ -241,6 +251,7 @@ async function selectPaper(paper) {
         questionsEmptyState.style.display = 'flex';
         preprocessScreen.style.display = 'flex';
         editMappingBtn.disabled = true;
+        unmapPaperBtn.disabled = true;
         
         // Select matched MS in dropdown if available
         if (paper.matched_mark_scheme) {
@@ -263,6 +274,11 @@ async function loadMapping(paperName) {
         questionsList.style.display = 'flex';
         splitScreen.style.display = 'grid';
         editMappingBtn.disabled = false;
+        unmapPaperBtn.disabled = false;
+        
+        // Mark scheme is hidden by default when loading a paper
+        state.showMarkScheme = false;
+        updateMarkSchemeVisibility();
         
         // Select first question automatically
         const keys = Object.keys(data.questions);
@@ -701,6 +717,7 @@ function resetViewer() {
     questionsList.style.display = 'none';
     questionsEmptyState.style.display = 'flex';
     editMappingBtn.disabled = true;
+    unmapPaperBtn.disabled = true;
     paperImageStack.innerHTML = '';
     msImageStack.innerHTML = '';
     state.zoom.paper = 1.0;
@@ -708,6 +725,65 @@ function resetViewer() {
     
     document.querySelectorAll('.zoom-level').forEach(el => el.textContent = '100%');
     document.querySelectorAll('.image-stack').forEach(el => el.style.transform = 'scale(1)');
+}
+
+function toggleMarkSchemeVisibility() {
+    state.showMarkScheme = !state.showMarkScheme;
+    updateMarkSchemeVisibility();
+}
+
+function updateMarkSchemeVisibility() {
+    const msPanel = document.getElementById('ms-panel');
+    if (state.showMarkScheme) {
+        splitScreen.style.gridTemplateColumns = '1fr 1fr';
+        msPanel.style.display = 'flex';
+        toggleMsBtn.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Hide Mark Scheme';
+        toggleMsBtn.classList.remove('show-state');
+    } else {
+        splitScreen.style.gridTemplateColumns = '1fr';
+        msPanel.style.display = 'none';
+        toggleMsBtn.innerHTML = '<i class="fa-solid fa-eye"></i> Show Mark Scheme';
+        toggleMsBtn.classList.add('show-state');
+    }
+}
+
+async function resetPaperMapping() {
+    if (!state.currentSubject || !state.currentPaper) return;
+    
+    if (!confirm(`Are you sure you want to reset "${state.currentPaper.name}"? This will clear the question mapping and require running alignment again.`)) {
+        return;
+    }
+    
+    showLoader('Resetting paper alignment...');
+    try {
+        const res = await fetch(`${API_URL}/api/unprocess`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                subject: state.currentSubject,
+                paper_name: state.currentPaper.name
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            // Reload subject's papers list
+            await fetchPapers(state.currentSubject);
+            // Re-select the same paper (which will now show the preprocess wizard)
+            const updatedPaper = state.papers.find(p => p.name === state.currentPaper.name);
+            if (updatedPaper) {
+                selectPaper(updatedPaper);
+            } else {
+                resetViewer();
+            }
+        } else {
+            alert(data.error || 'Failed to reset paper mapping.');
+        }
+    } catch (err) {
+        console.error(err);
+        alert('An error occurred while resetting the paper mapping.');
+    } finally {
+        hideLoader();
+    }
 }
 
 // PMT Downloader State

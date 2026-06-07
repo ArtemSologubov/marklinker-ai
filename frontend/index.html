@@ -120,9 +120,14 @@
             <div class="sidebar-section flex-grow">
                 <div class="section-header">
                     <h3><i class="fa-solid fa-list-check"></i> Questions</h3>
-                    <button id="edit-mapping-btn" class="text-btn" disabled>
-                        <i class="fa-solid fa-sliders"></i> Edit Mapping
-                    </button>
+                    <div class="section-actions" style="display: flex; gap: 10px;">
+                        <button id="edit-mapping-btn" class="text-btn" disabled>
+                            <i class="fa-solid fa-sliders"></i> Edit Mapping
+                        </button>
+                        <button id="unmap-paper-btn" class="text-btn" disabled style="color: var(--color-danger)">
+                            <i class="fa-solid fa-trash-can"></i> Reset
+                        </button>
+                    </div>
                 </div>
                 <div id="questions-empty-state" class="empty-state">
                     <i class="fa-solid fa-arrow-up"></i>
@@ -175,6 +180,9 @@
                     <div class="panel-header">
                         <h2><i class="fa-solid fa-question-circle"></i> Question <span id="current-q-num">1</span></h2>
                         <div class="panel-controls">
+                            <button id="toggle-ms-btn" class="toggle-ms-btn show-state" title="Toggle Mark Scheme Visibility" style="margin-right: 8px;">
+                                <i class="fa-solid fa-eye"></i> Show Mark Scheme
+                            </button>
                             <button class="zoom-out-btn icon-btn-sm" title="Zoom Out"><i class="fa-solid fa-minus"></i></button>
                             <span class="zoom-level">100%</span>
                             <button class="zoom-in-btn icon-btn-sm" title="Zoom In"><i class="fa-solid fa-plus"></i></button>

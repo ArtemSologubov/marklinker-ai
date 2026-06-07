@@ -260,6 +260,26 @@ def update_mapping():
         json.dump(meta, f, indent=2)
         
     return jsonify({"success": True, "message": "Mapping updated successfully"})
+ 
+@app.route("/api/unprocess", methods=["POST"])
+def unprocess_paper():
+    data = request.json
+    subject = data.get("subject")
+    paper_name = data.get("paper_name")
+    
+    if not subject or not paper_name:
+        return jsonify({"error": "subject and paper_name are required"}), 400
+        
+    paper_cache_dir = os.path.join(CACHE_DIR, subject, paper_name)
+    if os.path.exists(paper_cache_dir):
+        import shutil
+        try:
+            shutil.rmtree(paper_cache_dir)
+            return jsonify({"success": True, "message": "Paper cache reset successfully"})
+        except Exception as e:
+            return jsonify({"error": f"Failed to delete paper cache: {str(e)}"}), 500
+    else:
+        return jsonify({"success": True, "message": "Paper is already unmapped"})
 
 @app.route("/api/page/paper/<subject>/<paper_name>/<int:page_num>", methods=["GET"])
 def serve_paper_page(subject, paper_name, page_num):
