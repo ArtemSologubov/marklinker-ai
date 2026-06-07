@@ -1,0 +1,241 @@
+{
+  "a-level": {
+    "maths": [
+      "aqa",
+      "cie",
+      "edexcel",
+      "edexcel-ial",
+      "ocr",
+      "ocr-mei",
+      "wjec"
+    ],
+    "further-maths": [
+      "aqa",
+      "edexcel",
+      "ocr",
+      "ocr-mei",
+      "wjec"
+    ],
+    "biology": [
+      "aqa",
+      "cie",
+      "edexcel",
+      "edexcel-a",
+      "edexcel-b",
+      "ocr",
+      "ocr-a",
+      "ocr-b",
+      "wjec",
+      "wjec-eduqas",
+      "wjec-wales"
+    ],
+    "chemistry": [
+      "aqa",
+      "cie",
+      "edexcel",
+      "ocr",
+      "ocr-a",
+      "ocr-b",
+      "wjec",
+      "wjec-eduqas",
+      "wjec-wales"
+    ],
+    "computer-science": [
+      "aqa",
+      "caie",
+      "eduqas",
+      "ocr",
+      "wjec"
+    ],
+    "economics": [
+      "aqa",
+      "cie",
+      "edexcel",
+      "edexcel-a",
+      "edexcel-b",
+      "ocr",
+      "wjec",
+      "wjec-eduqas",
+      "wjec-wales"
+    ],
+    "english-language": [
+      "aqa",
+      "caie",
+      "edexcel",
+      "edexcel-ial",
+      "eduqas",
+      "ocr",
+      "wjec"
+    ],
+    "english-literature": [
+      "aqa-a",
+      "aqa-b",
+      "caie",
+      "edexcel",
+      "edexcel-ial",
+      "ocr",
+      "wjec-eduqas",
+      "wjec-wales"
+    ],
+    "geography": [
+      "aqa",
+      "cie",
+      "edexcel",
+      "ocr",
+      "wjec",
+      "wjec-eduqas",
+      "wjec-wales"
+    ],
+    "history": [
+      "aqa",
+      "caie",
+      "edexcel",
+      "edexcel-ial",
+      "ocr-a",
+      "wjec"
+    ],
+    "physics": [
+      "aqa",
+      "cie",
+      "edexcel",
+      "ocr",
+      "ocr-a",
+      "ocr-b",
+      "wjec",
+      "wjec-eduqas",
+      "wjec-wales"
+    ],
+    "psychology": [
+      "aqa",
+      "aqa-a",
+      "aqa-b",
+      "cie",
+      "cie-old",
+      "edexcel",
+      "edexcel-ial",
+      "ocr",
+      "wjec",
+      "wjec-eduqas",
+      "wjec-wales"
+    ]
+  },
+  "gcse": {
+    "biology": [
+      "aqa",
+      "cie-igcse",
+      "edexcel",
+      "edexcel-igcse",
+      "ocr-a",
+      "ocr-b",
+      "wjec",
+      "wjec-eduqas",
+      "wjec-wales"
+    ],
+    "chemistry": [
+      "aqa",
+      "cie-igcse",
+      "edexcel",
+      "edexcel-igcse",
+      "ocr-a",
+      "ocr-b",
+      "wjec",
+      "wjec-eduqas",
+      "wjec-wales"
+    ],
+    "computer-science": [
+      "aqa",
+      "caie",
+      "edexcel",
+      "edexcel-igcse",
+      "eduqas",
+      "ocr",
+      "wjec"
+    ],
+    "economics": [
+      "aqa",
+      "cie-igcse",
+      "edexcel-igcse",
+      "ocr"
+    ],
+    "english-language": [
+      "aqa",
+      "cie-igcse",
+      "edexcel",
+      "eduqas",
+      "ocr",
+      "wjec"
+    ],
+    "english-literature": [
+      "aqa",
+      "cie-igcse",
+      "edexcel",
+      "edexcel-igcse",
+      "eduqas",
+      "ocr",
+      "wjec"
+    ],
+    "geography": [
+      "aqa",
+      "cie-igcse",
+      "edexcel-a",
+      "edexcel-b",
+      "edexcel-igcse",
+      "ocr-a",
+      "ocr-b",
+      "wjec-eduqas-a",
+      "wjec-eduqas-b",
+      "wjec-wales"
+    ],
+    "history": [
+      "aqa",
+      "cie-igcse",
+      "edexcel",
+      "edexcel-igcse",
+      "ocr-a",
+      "ocr-b",
+      "wjec-eduqas",
+      "wjec-wales"
+    ],
+    "maths": [
+      "aqa",
+      "aqa-a",
+      "aqa-b",
+      "aqa-gcse-further",
+      "cie-igcse",
+      "cie-igcse-further",
+      "edexcel",
+      "edexcel-a",
+      "edexcel-b",
+      "edexcel-igcse-a",
+      "edexcel-igcse-b",
+      "edexcel-igcse-further",
+      "ocr",
+      "ocr-a",
+      "ocr-b",
+      "wjec-eduqas",
+      "wjec-wales"
+    ],
+    "physics": [
+      "aqa",
+      "cie-igcse",
+      "edexcel",
+      "edexcel-igcse",
+      "ocr-a",
+      "ocr-b",
+      "wjec",
+      "wjec-eduqas",
+      "wjec-wales"
+    ],
+    "psychology": [
+      "aqa",
+      "edexcel",
+      "ocr"
+    ],
+    "combined-science": [
+      "ocr-a",
+      "ocr-b",
+      "wjec-eduqas",
+      "wjec-wales"
+    ]
+  }
+}
